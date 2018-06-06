@@ -1,11 +1,11 @@
 /*
- * Appendix A program.
- * CSC 360, Summer 2017
+ * sh360.c 
+ * CSC 360, Summer 18
  *
  * This shows how a simple loop obtaining input from the user can
- * be written. Notice the use of "fflush".
+ * 
  *
- * If "impeach" is entered, then the shell terminates.
+ * 
  */
 
 #include <stdio.h>
@@ -21,6 +21,7 @@
 void cmd_loop(char* input, char** token, int* tp, char* t);
 void tokenize (char* input, char** token, int* tp, char* t);
 void launch_program (char** token);
+void execute_commands (char** token);
 
 int main(int argc, char *argv[]) {
 
@@ -47,27 +48,27 @@ void cmd_loop(char* input, char** token, int* tp, char* t ) {
 	
 	// For knowing the length of each user input
     int  line_len;
-	
+	int loop = 0;
 	// Repeating loop.
-    for(;;) {
+    while (!loop) {
         fprintf(stdout, "> ");
         fflush(stdout);
         fgets(input, MAX_INPUT_LINE, stdin);
         if (input[strlen(input) - 1] == '\n') {
             input[strlen(input) - 1] = '\0';
         }
-
-        if (strcmp(input, "exit") == 0) {
-            exit(0);
-		}
 		
 		tokenize(input, token, tp, t);
+		execute_commands(token);
 
 		int num_tokens = *tp;
 		int i = 0;
 		for (i = 0; i < num_tokens; i++) {
 			printf("%d: %s\n", i, token[i]);
 		} 
+		if (!strcmp(input, "exit")) {
+            loop = 1;
+		}
 		
     } 
 		
@@ -108,16 +109,47 @@ void tokenize (char* input, char** token, int* tp, char* t ) {
 void launch_program (char** token){
 	
 	// Initilizing
+	char* envp[] = {0};
 	pid_t pid;
-	pid_t wait_pid;
+	//pid_t wait_pid;
 	int status;
 	
+	// process fork
 	pid = fork();
 	
 	// child process
 	if(pid == 0) {
 		printf("child: about to start...\n");
-		execve(token[0], 
+		execve(token[0], token, envp);
+		fprintf(stderr, "execve failed, child process did not execute.\n");
+		
+	} else if (pid < 0) {
+		fprintf(stderr, "Error forking.\n");
+		
+	} 
+	// Parent process.
+	else {
+		// Parent waits for child.
+		while (wait(&status) > 0) {
+			printf ("yummy tummy");
+		}
+	}
+}
+
+void execute_commands (char** token) {
+	
+	int i;
+	
+	if (token[0] == NULL) {
+		printf("No arg entered");
+		
+	} else{
+		launch_program(token);
+	}
+}
+	
+	
+	
 	
 	
 	
