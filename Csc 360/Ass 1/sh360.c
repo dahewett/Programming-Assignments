@@ -1,11 +1,9 @@
 /*
  * sh360.c 
+ * Devin Hewett V00821219
  * CSC 360, Summer 18
  *
- * This shows how a simple loop obtaining input from the user can
- * 
- *
- * 
+ * Simple unix-like shell.
  */
 
 #include <stdio.h>
@@ -18,16 +16,17 @@
 #define MAX_INPUT_LINE 80
 #define MAX_NUM_ARGS 7
 
-void cmd_loop(char* input, char** token, int* tp, char* t);
+
+void cmd_loop(char* input, int* tp, char* t);
 void tokenize (char* input, char** token, int* tp, char* t);
 void launch_program (char** token);
-void execute_commands (char** token);
+void execute_commands (char** token, int* tp);
 
 int main(int argc, char *argv[]) {
 
 	//char userInput[MAX_INPUT_LINE];
 	char input[MAX_INPUT_LINE];
-	char *token [MAX_NUM_ARGS];
+
 	char *t;
 	//number of tokens (args)
 	int numTokens = 0;
@@ -37,20 +36,20 @@ int main(int argc, char *argv[]) {
 	
 	
 	//the shells repeating loop
-	cmd_loop(input, token, tp, t);
+	cmd_loop(input, tp, t);
 	//printf("/nnumTokens = &d" ,numTokens);
 	return 0;
-	
-	
 }
 	
-void cmd_loop(char* input, char** token, int* tp, char* t ) {
+void cmd_loop(char* input, int* tp, char* t ) {
 	
 	// For knowing the length of each user input
     int  line_len;
 	int loop = 0;
+	
 	// Repeating loop.
     while (!loop) {
+		char *token [MAX_NUM_ARGS];
         fprintf(stdout, "> ");
         fflush(stdout);
         fgets(input, MAX_INPUT_LINE, stdin);
@@ -59,24 +58,15 @@ void cmd_loop(char* input, char** token, int* tp, char* t ) {
         }
 		
 		tokenize(input, token, tp, t);
-		execute_commands(token);
+		execute_commands(token, tp);
 
 		int num_tokens = *tp;
-		int i = 0;
-		for (i = 0; i < num_tokens; i++) {
-			printf("%d: %s\n", i, token[i]);
-		} 
-		if (!strcmp(input, "exit")) {
-            loop = 1;
-		}
-		
     } 
-		
 }
 	
 void tokenize (char* input, char** token, int* tp, char* t ) {
 	
-	int i = 0;
+
 	// tokenize input
 	*tp = 0;
 	int num_tokens = *tp;
@@ -86,7 +76,7 @@ void tokenize (char* input, char** token, int* tp, char* t ) {
 	
 	// check for arguments length
 	if (num_tokens > MAX_NUM_ARGS) {
-		printf("Cannot have more than 7 arguments.");
+		fprintf(stderr, "Cannot have more than 7 arguments./n");
 	}
 	//
 	while(t != NULL && num_tokens < MAX_NUM_ARGS) {
@@ -94,16 +84,9 @@ void tokenize (char* input, char** token, int* tp, char* t ) {
 		num_tokens++;
 		t = strtok(NULL, " ");
 	}
-	/*
-	char *arguments[num_tokens];
-	memcpy(arguments, token, sizeof(arguments));
-
-	arg_length = sizeof(arguments) / sizeof(arguments[0]);
-	printf("Token Length: %d\n", arg_length);
-	*/
-
-
+	
 	*tp = num_tokens;
+
 }
 
 void launch_program (char** token){
@@ -111,7 +94,6 @@ void launch_program (char** token){
 	// Initilizing
 	char* envp[] = {0};
 	pid_t pid;
-	//pid_t wait_pid;
 	int status;
 	
 	// process fork
@@ -121,29 +103,43 @@ void launch_program (char** token){
 	if(pid == 0) {
 		printf("child: about to start...\n");
 		execve(token[0], token, envp);
-		fprintf(stderr, "execve failed, child process did not execute.\n");
+		fprintf(stderr, "Command not recognized.\n");
 		
 	} else if (pid < 0) {
 		fprintf(stderr, "Error forking.\n");
 		
 	} 
-	// Parent process.
-	else {
-		// Parent waits for child.
-		while (wait(&status) > 0) {
-			printf ("yummy tummy");
-		}
-	}
+	waitpid(pid, &status, 0);
+		
 }
 
-void execute_commands (char** token) {
+void execute_commands (char** token, int* tp) {
 	
-	int i;
+	int length_args = *tp;
 	
-	if (token[0] == NULL) {
-		printf("No arg entered");
+	if ( length_args == 0) {
+		printf("No arg entered\n");
+	} 
+	// Built-in commands:
+	// for changeing directories (cd)
+	else if ( strcmp(token[0], "cd") == 0) {
+		int check;
+		check = chdir(token[1]);
+		if(check != 0) {
+			fprintf(stderr, "cd: argument not recognized.\n");
+		}
+	}
+	// Display current directory 
+	else if (strcmp(token[0], "pwd") == 0) {
+		char directory[60];
+		getcwd(directory, 60);
+		printf("Current working directory: %s\n", directory);
 		
-	} else{
+	}
+	// Exit program
+	else if (!strcmp(token[0], "exit")) {
+            exit(0);
+	}else {
 		launch_program(token);
 	}
 }
