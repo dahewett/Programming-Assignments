@@ -1,9 +1,11 @@
 /*
  * sh360.c 
- * Devin Hewett V00821219
- * CSC 360, Summer 18
  *
- * Simple unix-like shell.
+ * Devin Hewett V00821219
+ * CSC 360, Summer 2018
+ * Assignment 1; Due: June 6, 2018
+ *
+ * Simple unix-like shell. With piping and output redirection.
  */
 
 #include <stdio.h>
@@ -24,15 +26,18 @@
 
 void cmd_loop(char* input, char** token, int* tp, char* t);
 void tokenize (char* input, char** token, int* tp, char* t);
-void launch_program (char** token);
+int launch_program (char** token);
 void execute_commands (char** token, int* tp);
 void read_file();
 void redirecting_output(char** token, int* tp);
 void create_arrow_index (char** token, int length_args);
+void prepend_arg(char** token, int rc);
 
 char prompt [MAX_PROMPT];
-char direct [10][10];
+char direct [10][MAX_INPUT_LINE];
 int arrows_ind [MAX_NUM_ARGS];
+int rc_counter = 1;
+char rc_arg [MAX_INPUT_LINE];
 
 int main(int argc, char *argv[]) {
 
@@ -96,13 +101,16 @@ void read_file () {
 	}
 	
 	fgets(prompt, MAX_PROMPT, file_pointer);
+	
 	if( prompt[strlen(prompt) - 1] == '\n') {
 		prompt[strlen(prompt) - 1] = '\0';
+		
 	}
 	
 	int i = 0;
 	
 	while (fgets(direct[i], sizeof(direct[i]), file_pointer) && i < 10) {
+		rc_counter++;
 		// Use a char pointer to go through the 2D array
 		char* dirP;
 		dirP = direct[i];
@@ -110,8 +118,11 @@ void read_file () {
 		if( dirP[strlen(dirP) - 1] == '\n') {
 			dirP[strlen(dirP) - 1] = '\0'; 
 		}
+		
 		i++;
 	}
+	// end of dirct array with null
+	//strcpy(direct[i], '\0');
 }
 	
 	
@@ -140,31 +151,45 @@ void tokenize (char* input, char** token, int* tp, char* t ) {
 
 }
 
-void launch_program (char** token){
+int launch_program (char** token){
 	
 	// Initilizing
 	char* envp[] = {0};
 	pid_t pid;
 	int status;
+	// check all of rc direct array
+	int i;
+
+	for (i = 0; i < rc_counter-1; i++) {
+		prepend_arg(token, i);
+		// process fork
+		pid = fork();
 	
-	// process fork
-	pid = fork();
+		// child process
+		if(pid == 0) {
+
+			execve(rc_arg, token, envp);
+			continue;
+			
+		} else if (pid < 0) {
+			fprintf(stderr, "Error forking.\n");
+			
+		} 
+		waitpid(pid, &status, 0);
+		return 0;
+	}
+	fprintf(stderr, "Command not recognized.\n");
+	return 1;
+		
+}
+// appending index of rc to token
+void prepend_arg (char** token, int rc) {
 	
-	// child process
-	if(pid == 0) {
-		//printf("child: about to start...\n");
-		//printf("%s\n", token[0]);
-		execve(token[0], token, envp);
-		fprintf(stderr, "Command not recognized.\n");
-		
-		
-	} else if (pid < 0) {
-		fprintf(stderr, "Error forking.\n");
-		
-	} 
-	waitpid(pid, &status, 0);
 	
-		
+	stpcpy(rc_arg, direct[rc]);
+	strcat(rc_arg, "/");
+	strcat(rc_arg, token[0]);
+	
 }
 
 void execute_commands (char** token, int* tp) {
@@ -172,7 +197,7 @@ void execute_commands (char** token, int* tp) {
 	int length_args = *tp;
 	
 	if ( length_args == 0) {
-		printf("No arg entered\n");
+	
 	} else if (strcmp(token[0], "OR") == 0) {
 		redirecting_output(token, tp);
 	}
@@ -232,7 +257,7 @@ void redirecting_output (char** token, int* tp) {
 		dup2(fd, 1);
 		dup2(fd, 2);
 		execve(or_args[0], or_args, envp);
-		fprintf(stderr, "OR: failed to execute proccess/n");
+		fprintf(stderr, "OR: failed to execute proccess\n");
 	}
 	// wait for child
 	waitpid(pid, &status, 0);
